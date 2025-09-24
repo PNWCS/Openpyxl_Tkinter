@@ -20,7 +20,12 @@ def select_excel_file() -> str:
     Note:
         Opens a file dialog that allows users to select .xlsx files only.
     """
-    raise NotImplementedError()
+    file_path = filedialog.askopenfilename(
+        title="Select Excel File",
+        filetypes=[("Excel Files", "*.xlsx")],
+        defaultextension=".xlsx"
+    )
+    return file_path or ""
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
@@ -34,7 +39,10 @@ def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> 
     Note:
         Calculates the percentage and updates the progress bar value.
     """
-    raise NotImplementedError()
+    if total > 0:
+        percent = int((current + 1) / total * 100)
+        progress_bar["value"] = percent
+        progress_bar.update_idletasks()
 
 
 def process_file_in_background(
@@ -129,7 +137,6 @@ def run_app() -> None:
     root = create_main_window()
 
     # Create and pack widgets
-    # Button frame
     button_frame = tk.Frame(root)
     button_frame.pack(pady=10)
 
@@ -138,28 +145,24 @@ def run_app() -> None:
     )
     select_button.pack()
 
-    # Progress frame
     progress_frame = tk.Frame(root)
     progress_frame.pack(pady=5)
 
     progress_bar = ttk.Progressbar(progress_frame, length=400, mode="determinate")
     progress_bar.pack()
 
-    # Status frame
     status_frame = tk.Frame(root)
     status_frame.pack(pady=5)
 
     status_label = tk.Label(status_frame, text="Select an Excel file to begin", font=("Arial", 10))
     status_label.pack()
 
-    # Results frame
     results_frame = tk.Frame(root)
     results_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
     results_label = tk.Label(results_frame, text="Results:", font=("Arial", 10, "bold"))
     results_label.pack(anchor="w")
 
-    # Text widget with scrollbar
     text_frame = tk.Frame(results_frame)
     text_frame.pack(fill="both", expand=True)
 
@@ -180,6 +183,4 @@ def run_app() -> None:
             )
 
     select_button.config(command=on_select_file)
-
-    # Start the application
     root.mainloop()
