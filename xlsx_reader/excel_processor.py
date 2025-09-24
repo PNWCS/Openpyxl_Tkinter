@@ -39,8 +39,10 @@ def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
         Uses openpyxl to count rows with data in the specified sheet.
         Excludes header row from count.
     """
+    # Loading the workbook
     workbook = load_workbook(file_path)
-    return workbook[sheet_name].max_row -1
+    return workbook[sheet_name].max_row - 1
+
 
 def process_excel_file(
     file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
