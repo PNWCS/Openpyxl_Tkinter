@@ -21,9 +21,7 @@ def select_excel_file() -> str:
         Opens a file dialog that allows users to select .xlsx files only.
     """
     file_path = filedialog.askopenfilename(
-        title="Select Excel File",
-        filetypes=[("Excel Files", "*.xlsx")],
-        defaultextension=".xlsx"
+        title="Select Excel File", filetypes=[("Excel Files", "*.xlsx")], defaultextension=".xlsx"
     )
     return file_path or ""
 

@@ -15,7 +15,6 @@ def get_sheet_names(file_path: str) -> list[str]:
     return sheetnames
 
 
-
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
     wb = load_workbook(file_path, read_only=True)
     sheet = wb[sheet_name]
@@ -25,7 +24,6 @@ def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
             row_count += 1
     wb.close()  # <-- close workbook here
     return row_count
-
 
 
 def process_excel_file(
@@ -44,4 +42,3 @@ def process_excel_file(
         results[sheet_name] = row_count
 
     return results
-
