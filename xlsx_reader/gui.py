@@ -20,7 +20,13 @@ def select_excel_file() -> str:
     Note:
         Opens a file dialog that allows users to select .xlsx files only.
     """
-    raise NotImplementedError()
+    # Use tkinter filedialog to let the user pick an .xlsx file.
+    # Return empty string if the dialog is cancelled.
+    file_path = filedialog.askopenfilename(
+        title="Select Excel file",
+        filetypes=[("Excel files", "*.xlsx")],
+    )
+    return file_path or ""
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
@@ -34,7 +40,24 @@ def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> 
     Note:
         Calculates the percentage and updates the progress bar value.
     """
-    raise NotImplementedError()
+    # Avoid division by zero; if total is 0 treat as complete.
+    if total <= 0:
+        progress_bar["value"] = 100
+        return
+
+    # current is 0-based index for sheets processed; calculate percentage
+    # We consider progress as (current / total) * 100, but when processing
+    # the last sheet current == total - 1, and we want near 100%; this
+    # function is used while processing each sheet, so map current ->
+    # completed proportion.
+    try:
+        percent = int((current / total) * 100)
+    except Exception:
+        percent = 0
+
+    # Clamp between 0 and 100
+    percent = max(0, min(100, percent))
+    progress_bar["value"] = percent
 
 
 def process_file_in_background(
