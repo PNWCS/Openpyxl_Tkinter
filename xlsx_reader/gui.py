@@ -25,6 +25,7 @@ def select_excel_file() -> str:
         filetypes=[("Excel Files", "*.xlsx")],
         defaultextension=".xlsx",
     )
+
     return file_path
 
 
