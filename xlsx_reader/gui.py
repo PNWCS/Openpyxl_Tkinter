@@ -20,7 +20,16 @@ def select_excel_file() -> str:
     Note:
         Opens a file dialog that allows users to select .xlsx files only.
     """
-    raise NotImplementedError()
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(
+        title="Select a .xlsx file", filetypes=[("Excel Files", "*.xlsx")]
+    )
+
+    if file_path:
+        return file_path
+    else:
+        return None
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
