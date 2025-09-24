@@ -20,7 +20,10 @@ def select_excel_file() -> str:
     Note:
         Opens a file dialog that allows users to select .xlsx files only.
     """
-    raise NotImplementedError()
+    file_path = filedialog.askopenfilename(
+        title="Select an Excel File", filetypes=[("Excel Files", "*.xlsx")]
+    )
+    return file_path
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
@@ -34,7 +37,11 @@ def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> 
     Note:
         Calculates the percentage and updates the progress bar value.
     """
-    raise NotImplementedError()
+    if total > 0:
+        percentage = (current / total) * 100
+        progress_bar["value"] = percentage
+        # Force GUI to update from the background thread
+        progress_bar.master.update_idletasks()
 
 
 def process_file_in_background(
@@ -65,6 +72,7 @@ def process_file_in_background(
             process_button.config(state="disabled")
             status_label.config(text="Processing...")
             progress_bar["value"] = 0
+            results_text.delete("1.0", tk.END)
 
             def progress_callback(current, total, sheet_name):
                 status_label.config(text=f"Processing sheet: {sheet_name}")
@@ -72,11 +80,11 @@ def process_file_in_background(
 
             results = process_excel_file(file_path, progress_callback)
 
-            progress_bar["value"] = 100
+            # Final update after loop finishes
+            update_progress(progress_bar, len(results), len(results))
             status_label.config(text="Processing complete!")
 
             # Show results in text widget
-            results_text.delete("1.0", tk.END)
             results_text.insert(tk.END, "Row counts per sheet:\n")
             results_text.insert(tk.END, "-" * 30 + "\n")
             for sheet_name, row_count in results.items():
@@ -140,10 +148,10 @@ def run_app() -> None:
 
     # Progress frame
     progress_frame = tk.Frame(root)
-    progress_frame.pack(pady=5)
+    progress_frame.pack(pady=5, fill="x", padx=20)
 
     progress_bar = ttk.Progressbar(progress_frame, length=400, mode="determinate")
-    progress_bar.pack()
+    progress_bar.pack(fill="x")
 
     # Status frame
     status_frame = tk.Frame(root)
