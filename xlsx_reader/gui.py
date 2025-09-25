@@ -6,7 +6,7 @@ and showing progress while processing them.
 
 import threading
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import ttk
 
 from .excel_processor import process_excel_file
 
