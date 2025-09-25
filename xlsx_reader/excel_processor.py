@@ -1,8 +1,4 @@
-"""Excel processing module for reading XLSX files.
-
-This module provides simple functions to read Excel files and get basic
-sheet information using pandas.
-"""
+"""Excel processing module for reading XLSX files."""
 
 from collections.abc import Callable
 
@@ -10,55 +6,34 @@ from openpyxl import load_workbook
 
 
 def get_sheet_names(file_path: str) -> list[str]:
-    """Get all sheet names from an Excel file.
-
-    Args:
-        file_path (str): Path to the Excel file (.xlsx)
-
-    Returns:
-        List[str]: List of sheet names in the workbook
-
-    Note:
-        Uses openpyxl to read the sheet names without loading all data.
-    """
-    raise NotImplementedError()
+    """Get all sheet names from an Excel file."""
+    wb = load_workbook(file_path, read_only=True)
+    sheet_names = wb.sheetnames
+    wb.close()  # Important: close the workbook to release file lock
+    return sheet_names
 
 
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
-    """Get the number of rows in a specific sheet.
+    """Get the number of rows in a specific sheet (excluding header)."""
+    wb = load_workbook(file_path, read_only=True)
+    ws = wb[sheet_name]
 
-    Args:
-        file_path (str): Path to the Excel file (.xlsx)
-        sheet_name (str): Name of the sheet to analyze
+    # Count rows that contain data (ignoring completely empty rows)
+    row_count = 0
+    for row in ws.iter_rows(values_only=True):
+        if any(cell is not None for cell in row):  # row has data
+            row_count += 1
 
-    Returns:
-        int: Number of rows in the sheet
+    wb.close()  # Close workbook to release file lock
 
-    Note:
-        Uses openpyxl to count rows with data in the specified sheet.
-        Excludes header row from count.
-    """
-    raise NotImplementedError()
+    # Exclude header row if there is at least one row
+    return max(row_count - 1, 0)
+
 
 def process_excel_file(
     file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
 ) -> dict[str, int]:
-    """Process an Excel file and return row counts for each sheet.
-
-    Args:
-        file_path (str): Path to the Excel file (.xlsx)
-        progress_callback (Optional[Callable]): Function to call for progress updates.
-            Receives (current_sheet_index, total_sheets, sheet_name)
-
-    Returns:
-        Dict[str, int]: Dictionary mapping sheet names to their row counts
-
-    Note:
-        1. Get all sheet names using get_sheet_names()
-        2. For each sheet, call get_sheet_row_count()
-        3. Call progress_callback if provided
-        4. Return a dictionary with sheet names as keys and row counts as values
-    """
+    """Process an Excel file and return row counts for each sheet."""
     sheet_names = get_sheet_names(file_path)
     total_sheets = len(sheet_names)
     results = {}
