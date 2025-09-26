@@ -21,7 +21,9 @@ def get_sheet_names(file_path: str) -> list[str]:
     Note:
         Uses openpyxl to read the sheet names without loading all data.
     """
-    raise NotImplementedError()
+    workbook = load_workbook(filename=file_path, read_only=True)
+    workbook.close()
+    return workbook.sheetnames
 
 
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
@@ -38,7 +40,10 @@ def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
         Uses openpyxl to count rows with data in the specified sheet.
         Excludes header row from count.
     """
-    raise NotImplementedError()
+    workbook = load_workbook(filename=file_path, read_only=True)
+    workbook.close()
+    return workbook[sheet_name].max_row - 1  # Exclude header row
+
 
 def process_excel_file(
     file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
