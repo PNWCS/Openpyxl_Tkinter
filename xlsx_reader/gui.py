@@ -45,7 +45,7 @@ def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> 
     """
     if total > 0:
         percentage = ((current + 1) / total) * 100
-        progress_bar['Value'] = percentage
+        progress_bar['value'] = percentage
         progress_bar.master.update_idletasks()
 
 
