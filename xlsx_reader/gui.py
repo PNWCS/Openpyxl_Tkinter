@@ -20,7 +20,16 @@ def select_excel_file() -> str:
     Note:
         Opens a file dialog that allows users to select .xlsx files only.
     """
-    raise NotImplementedError()
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(
+        title="Select a .xlsx file", filetypes=[("Excel Files", "*.xlsx")]
+    )
+
+    if file_path:
+        return file_path
+    else:
+        return None
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
@@ -34,7 +43,10 @@ def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> 
     Note:
         Calculates the percentage and updates the progress bar value.
     """
-    raise NotImplementedError()
+    if total > 0:
+        percentage = ((current + 1) / total) * 100
+        progress_bar['value'] = percentage
+        progress_bar.master.update_idletasks()
 
 
 def process_file_in_background(
