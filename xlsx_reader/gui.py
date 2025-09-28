@@ -1,40 +1,42 @@
 """GUI module for XLSX Reader application.
 
-This module provides a simple tkinter interface for selecting Excel files
-and showing progress while processing them.
+Provides a Tkinter interface to select an Excel file (.xlsx),
+show live progress while processing, and display per-sheet row counts.
 """
+
+from __future__ import annotations
 
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, ttk
+from typing import Literal
 
 from .excel_processor import process_excel_file
 
 
 def select_excel_file() -> str:
-    """Open a file dialog to select an Excel file.
-
-    Returns:
-        str: Path to selected Excel file, or empty string if cancelled
-
-    Note:
-        Opens a file dialog that allows users to select .xlsx files only.
-    """
-    raise NotImplementedError()
+    """Open a file dialog to select an Excel file (.xlsx)."""
+    path = filedialog.askopenfilename(
+        title="Select Excel File",
+        filetypes=[("Excel Workbook", "*.xlsx")],
+        defaultextension=".xlsx",
+    )
+    return path or ""
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
-    """Update the progress bar.
-
-    Args:
-        progress_bar: The progress bar widget to update
-        current: Current sheet number (0-based)
-        total: Total number of sheets
-
-    Note:
-        Calculates the percentage and updates the progress bar value.
-    """
-    raise NotImplementedError()
+    """Update the determinate progress bar using a zero-based `current` index."""
+    if total <= 0:
+        progress_bar["value"] = 0
+        return
+    percent = int(((current + 1) / total) * 100)
+    if percent < 0:
+        percent = 0
+    if percent > 100:
+        percent = 100
+    # subscript style keeps mypy happy with tk stubs
+    progress_bar["value"] = percent
 
 
 def process_file_in_background(
@@ -44,70 +46,74 @@ def process_file_in_background(
     process_button: tk.Button,
     results_text: tk.Text,
 ) -> None:
-    """Process Excel file in a background thread.
+    """Run processing in a worker thread and marshal UI updates onto the main thread."""
 
-    Args:
-        file_path: Path to the Excel file
-        progress_bar: Progress bar widget
-        status_label: Label to show current status
-        process_button: Button to re-enable when done
-        results_text: Text widget to display results
+    # --- UI helpers (schedule back to main thread) ---
+    def ui_set_status(text: str) -> None:
+        status_label.after(0, lambda: status_label.config(text=text))
 
-    Note:
-        1. Run processing in a separate thread
-        2. Update progress bar and status label
-        3. Show results in the text widget
-        4. Handle any errors
-    """
+    def ui_set_button_state(state: Literal["normal", "disabled", "active"]) -> None:
+        process_button.after(0, lambda: process_button.config(state=state))
 
-    def process_in_thread():
-        try:
-            process_button.config(state="disabled")
-            status_label.config(text="Processing...")
-            progress_bar["value"] = 0
+    def ui_set_progress(current: int, total: int) -> None:
+        progress_bar.after(0, lambda: update_progress(progress_bar, current, total))
 
-            def progress_callback(current, total, sheet_name):
-                status_label.config(text=f"Processing sheet: {sheet_name}")
-                update_progress(progress_bar, current, total)
+    def ui_set_progress_value(value: int) -> None:
+        progress_bar.after(0, lambda: progress_bar.__setitem__("value", value))
 
-            results = process_excel_file(file_path, progress_callback)
-
-            progress_bar["value"] = 100
-            status_label.config(text="Processing complete!")
-
-            # Show results in text widget
+    def ui_show_results(results: dict[str, int]) -> None:
+        def _render() -> None:
             results_text.delete("1.0", tk.END)
             results_text.insert(tk.END, "Row counts per sheet:\n")
             results_text.insert(tk.END, "-" * 30 + "\n")
             for sheet_name, row_count in results.items():
                 results_text.insert(tk.END, f"{sheet_name}: {row_count} rows\n")
-
             total_rows = sum(results.values())
             results_text.insert(tk.END, "-" * 30 + "\n")
             results_text.insert(tk.END, f"Total rows: {total_rows}\n")
             results_text.insert(tk.END, f"Total sheets: {len(results)}\n")
 
-        except Exception as e:
-            status_label.config(text="Error occurred!")
+        results_text.after(0, _render)
+
+    def ui_show_error(msg: str) -> None:
+        def _render() -> None:
             results_text.delete("1.0", tk.END)
-            results_text.insert(tk.END, f"Error processing file:\n{str(e)}")
+            results_text.insert(tk.END, f"Error processing file:\n{msg}")
 
+        results_text.after(0, _render)
+
+    # --- Worker function ---
+    def worker() -> None:
+        try:
+            ui_set_button_state("disabled")
+            ui_set_status("Processing...")
+            ui_set_progress_value(0)
+
+            def progress_callback(current: int, total: int, sheet_name: str) -> None:
+                ui_set_status(f"Processing sheet: {sheet_name}")
+                ui_set_progress(current, total)
+
+            results = process_excel_file(file_path, progress_callback)
+
+            ui_set_progress_value(100)
+            ui_set_status("Processing complete!")
+            ui_show_results(results)
+
+        except Exception as exc:  # noqa: BLE001
+            ui_set_status("Error occurred!")
+            ui_show_error(str(exc))
         finally:
-            process_button.config(state="normal")
+            ui_set_button_state("normal")
 
-    threading.Thread(target=process_in_thread, daemon=True).start()
+    if not Path(file_path).exists():
+        ui_set_status("Selected file not found.")
+        return
+
+    threading.Thread(target=worker, daemon=True).start()
 
 
 def create_main_window() -> tk.Tk:
-    """Create the main application window.
-
-    Returns:
-        tk.Tk: The main window
-
-    Note:
-        create a window with title "XLSX Reader"
-        and appropriate size (e.g., 500x400 to fit results display).
-    """
+    """Create and configure the main application window."""
     root = tk.Tk()
     root.title("XLSX Reader")
     root.geometry("500x400")
@@ -116,70 +122,65 @@ def create_main_window() -> tk.Tk:
 
 
 def run_app() -> None:
-    """Run the main application.
-
-    Note:
-        1. Create the main window
-        2. Add a "Select Excel File" button
-        3. Add a progress bar
-        4. Add a status label
-        5. Add a text widget to display results
-        6. Start the tkinter main loop
-    """
+    """Build the UI and start the Tkinter main loop."""
     root = create_main_window()
 
-    # Create and pack widgets
-    # Button frame
+    # Top controls
     button_frame = tk.Frame(root)
     button_frame.pack(pady=10)
 
     select_button = tk.Button(
-        button_frame, text="Select Excel File", font=("Arial", 12), bg="lightblue", width=20
+        button_frame,
+        text="Select Excel File",
+        font=("Arial", 12),
+        bg="lightblue",
+        width=20,
     )
     select_button.pack()
 
-    # Progress frame
+    # Progress
     progress_frame = tk.Frame(root)
     progress_frame.pack(pady=5)
 
-    progress_bar = ttk.Progressbar(progress_frame, length=400, mode="determinate")
+    progress_bar = ttk.Progressbar(progress_frame, length=400, mode="determinate", maximum=100)
     progress_bar.pack()
 
-    # Status frame
+    # Status
     status_frame = tk.Frame(root)
     status_frame.pack(pady=5)
 
     status_label = tk.Label(status_frame, text="Select an Excel file to begin", font=("Arial", 10))
     status_label.pack()
 
-    # Results frame
+    # Results (with scrollbar)
     results_frame = tk.Frame(root)
     results_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
     results_label = tk.Label(results_frame, text="Results:", font=("Arial", 10, "bold"))
     results_label.pack(anchor="w")
 
-    # Text widget with scrollbar
     text_frame = tk.Frame(results_frame)
     text_frame.pack(fill="both", expand=True)
 
     results_text = tk.Text(text_frame, height=12, width=50, font=("Courier", 10), wrap=tk.WORD)
-
     scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=results_text.yview)
     results_text.configure(yscrollcommand=scrollbar.set)
 
     results_text.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # Configure button click event
-    def on_select_file():
-        file_path = select_excel_file()
-        if file_path:
+    # Button action
+    def on_select_file() -> None:
+        path = select_excel_file()
+        if path:
             process_file_in_background(
-                file_path, progress_bar, status_label, select_button, results_text
+                path, progress_bar, status_label, select_button, results_text
             )
 
     select_button.config(command=on_select_file)
 
-    # Start the application
     root.mainloop()
+
+
+if __name__ == "__main__":
+    run_app()

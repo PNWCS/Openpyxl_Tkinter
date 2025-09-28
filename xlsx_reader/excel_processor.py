@@ -1,73 +1,95 @@
 """Excel processing module for reading XLSX files.
 
-This module provides simple functions to read Excel files and get basic
-sheet information using pandas.
+Provides functions to:
+- list sheet names
+- count data rows per sheet (excluding header row)
+- process an entire workbook with a progress callback
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
+from pathlib import Path
 
 from openpyxl import load_workbook
 
 
+def _ensure_exists(file_path: str) -> None:
+    """Raise FileNotFoundError if the path does not exist."""
+    if not Path(file_path).exists():
+        raise FileNotFoundError(file_path)
+
+
 def get_sheet_names(file_path: str) -> list[str]:
-    """Get all sheet names from an Excel file.
+    """Return sheet names in creation order.
 
     Args:
-        file_path (str): Path to the Excel file (.xlsx)
+        file_path: Path to the .xlsx file.
 
     Returns:
-        List[str]: List of sheet names in the workbook
-
-    Note:
-        Uses openpyxl to read the sheet names without loading all data.
+        list[str]: Sheet names.
     """
-    raise NotImplementedError()
+    _ensure_exists(file_path)
+    wb = load_workbook(file_path, read_only=True, data_only=True)
+    try:
+        return list(wb.sheetnames)
+    finally:
+        wb.close()
 
 
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
-    """Get the number of rows in a specific sheet.
+    """Return number of non-empty data rows in a sheet (excluding header row).
 
     Args:
-        file_path (str): Path to the Excel file (.xlsx)
-        sheet_name (str): Name of the sheet to analyze
+        file_path: Path to the .xlsx file.
+        sheet_name: Name of the sheet to inspect.
 
     Returns:
-        int: Number of rows in the sheet
-
-    Note:
-        Uses openpyxl to count rows with data in the specified sheet.
-        Excludes header row from count.
+        int: Count of rows that contain any data, starting from row 2.
     """
-    raise NotImplementedError()
+    _ensure_exists(file_path)
+    wb = load_workbook(file_path, read_only=True, data_only=True)
+    try:
+        if sheet_name not in wb.sheetnames:
+            raise KeyError(f"Sheet {sheet_name!r} not found in workbook.")
+        ws = wb[sheet_name]
+
+        count = 0
+        # Skip header row (row=1); count any row with at least one non-empty cell.
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if any(cell is not None and cell != "" for cell in row):
+                count += 1
+        return count
+    finally:
+        wb.close()
+
 
 def process_excel_file(
-    file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
+    file_path: str,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, int]:
-    """Process an Excel file and return row counts for each sheet.
+    """Process all sheets and return a mapping {sheet_name: row_count}.
+
+    The progress callback (if provided) is called as:
+        progress_callback(current_index, total_sheets, sheet_name)
+    where current_index is zero-based.
 
     Args:
-        file_path (str): Path to the Excel file (.xlsx)
-        progress_callback (Optional[Callable]): Function to call for progress updates.
-            Receives (current_sheet_index, total_sheets, sheet_name)
+        file_path: Path to the .xlsx file.
+        progress_callback: Optional progress reporter.
 
     Returns:
-        Dict[str, int]: Dictionary mapping sheet names to their row counts
-
-    Note:
-        1. Get all sheet names using get_sheet_names()
-        2. For each sheet, call get_sheet_row_count()
-        3. Call progress_callback if provided
-        4. Return a dictionary with sheet names as keys and row counts as values
+        dict[str, int]: Row counts per sheet.
     """
-    sheet_names = get_sheet_names(file_path)
-    total_sheets = len(sheet_names)
-    results = {}
+    _ensure_exists(file_path)
 
-    for current_index, sheet_name in enumerate(sheet_names):
+    sheets = get_sheet_names(file_path)
+    total = len(sheets)
+    results: dict[str, int] = {}
+
+    for idx, name in enumerate(sheets):  # idx = 0..total-1
         if progress_callback:
-            progress_callback(current_index, total_sheets, sheet_name)
-
-        row_count = get_sheet_row_count(file_path, sheet_name)
-        results[sheet_name] = row_count
+            progress_callback(idx, total, name)
+        results[name] = get_sheet_row_count(file_path, name)
 
     return results
