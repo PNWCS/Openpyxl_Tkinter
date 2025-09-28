@@ -1,122 +1,105 @@
 """Tests for Excel processing functions.
 
-This module tests the core Excel processing functionality using simple
-test cases with pre-created Excel files.
+Covers:
+- Reading sheet names
+- Counting data rows (excluding header)
+- Processing all sheets with optional progress callback
+- File-not-found handling
 """
 
-import tempfile
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
 
-from xlsx_reader.excel_processor import get_sheet_names, get_sheet_row_count, process_excel_file
+from xlsx_reader.excel_processor import (
+    get_sheet_names,
+    get_sheet_row_count,
+    process_excel_file,
+)
 
 
-def create_test_excel(file_path: str) -> None:
-    """Create a simple test Excel file with multiple sheets."""
-    workbook = Workbook()
+def _create_test_excel(path: Path) -> None:
+    """Create a simple test workbook with 3 sheets."""
+    wb = Workbook()
+    # remove default "Sheet"
+    wb.remove(wb.active)
 
-    # Remove default sheet
-    workbook.remove(workbook.active)
-
-    # Sheet 1: 10 rows
-    sheet1 = workbook.create_sheet("Sheet1")
-    sheet1["A1"] = "A"
-    sheet1["B1"] = "B"
+    # Sheet1: 10 data rows (+1 header row)
+    s1 = wb.create_sheet("Sheet1")
+    s1["A1"], s1["B1"] = "A", "B"
     for i in range(1, 11):
-        sheet1[f"A{i + 1}"] = i
-        sheet1[f"B{i + 1}"] = f"Row {i}"
+        s1[f"A{i + 1}"] = i
+        s1[f"B{i + 1}"] = f"Row {i}"
 
-    # Sheet 2: 5 rows
-    sheet2 = workbook.create_sheet("Sheet2")
-    sheet2["X1"] = "X"
-    sheet2["Y1"] = "Y"
+    # Sheet2: 5 data rows (+1 header row)
+    s2 = wb.create_sheet("Sheet2")
+    s2["X1"], s2["Y1"] = "X", "Y"
     for i in range(1, 6):
-        sheet2[f"X{i + 1}"] = i
-        sheet2[f"Y{i + 1}"] = f"Data {i}"
+        s2[f"X{i + 1}"] = i
+        s2[f"Y{i + 1}"] = f"Data {i}"
 
-    # Sheet 3: Empty (0 rows) - just headers
-    sheet3 = workbook.create_sheet("EmptySheet")
-    sheet3["A1"] = "Col1"
-    sheet3["B1"] = "Col2"
+    # EmptySheet: headers only (0 data rows)
+    s3 = wb.create_sheet("EmptySheet")
+    s3["A1"], s3["B1"] = "Col1", "Col2"
 
-    workbook.save(file_path)
+    wb.save(path)
+
+
+@pytest.fixture
+def test_excel_file(tmp_path: Path) -> str:
+    """Provide a temporary .xlsx file populated with predictable data."""
+    xlsx_path = tmp_path / "sample.xlsx"
+    _create_test_excel(xlsx_path)
+    return str(xlsx_path)
 
 
 class TestExcelProcessor:
-    """Test cases for Excel processing functions."""
+    def test_get_sheet_names(self, test_excel_file: str) -> None:
+        names = get_sheet_names(test_excel_file)
+        assert isinstance(names, list)
+        assert set(names) == {"Sheet1", "Sheet2", "EmptySheet"}
+        # preserve creation order
+        assert names == ["Sheet1", "Sheet2", "EmptySheet"]
 
-    @pytest.fixture
-    def test_excel_file(self):
-        """Create a temporary Excel file for testing."""
-        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
-        tmp_path = Path(tmp.name)
-        try:
-            tmp.close()
-            create_test_excel(str(tmp_path))
-            yield str(tmp_path)
-        finally:
-            if tmp_path.exists():
-                tmp_path.unlink()
+    @pytest.mark.parametrize(
+        ("sheet", "expected_rows"),
+        [
+            ("Sheet1", 10),
+            ("Sheet2", 5),
+            ("EmptySheet", 0),
+        ],
+    )
+    def test_get_sheet_row_count(
+        self, test_excel_file: str, sheet: str, expected_rows: int
+    ) -> None:
+        assert get_sheet_row_count(test_excel_file, sheet) == expected_rows
 
-    def test_get_sheet_names(self, test_excel_file):
-        """Test getting sheet names from Excel file."""
-        sheet_names = get_sheet_names(test_excel_file)
+    def test_process_excel_file(self, test_excel_file: str) -> None:
+        results: dict[str, int] = process_excel_file(test_excel_file)
+        assert results == {"Sheet1": 10, "Sheet2": 5, "EmptySheet": 0}
 
-        assert isinstance(sheet_names, list)
-        assert len(sheet_names) == 3
-        assert "Sheet1" in sheet_names
-        assert "Sheet2" in sheet_names
-        assert "EmptySheet" in sheet_names
+    def test_process_excel_file_with_callback(self, test_excel_file: str) -> None:
+        calls: list[tuple[int, int, str]] = []
 
-    def test_get_sheet_row_count_normal_sheet(self, test_excel_file):
-        """Test getting row count from a normal sheet."""
-        row_count = get_sheet_row_count(test_excel_file, "Sheet1")
-        assert row_count == 10
+        def cb(current: int, total: int, sheet_name: str) -> None:
+            calls.append((current, total, sheet_name))
 
-    def test_get_sheet_row_count_small_sheet(self, test_excel_file):
-        """Test getting row count from a smaller sheet."""
-        row_count = get_sheet_row_count(test_excel_file, "Sheet2")
-        assert row_count == 5
+        process_excel_file(test_excel_file, progress_callback=cb)
 
-    def test_get_sheet_row_count_empty_sheet(self, test_excel_file):
-        """Test getting row count from an empty sheet."""
-        row_count = get_sheet_row_count(test_excel_file, "EmptySheet")
-        assert row_count == 0
+        # one callback per sheet, in order
+        assert calls == [
+            (0, 3, "Sheet1"),
+            (1, 3, "Sheet2"),
+            (2, 3, "EmptySheet"),
+        ]
 
-    def test_process_excel_file(self, test_excel_file):
-        """Test processing entire Excel file."""
-        results = process_excel_file(test_excel_file)
-
-        assert isinstance(results, dict)
-        assert len(results) == 3
-        assert results["Sheet1"] == 10
-        assert results["Sheet2"] == 5
-        assert results["EmptySheet"] == 0
-
-    def test_process_excel_file_with_callback(self, test_excel_file):
-        """Test processing Excel file with progress callback."""
-        progress_calls = []
-
-        def progress_callback(current, total, sheet_name):
-            progress_calls.append((current, total, sheet_name))
-
-        process_excel_file(test_excel_file, progress_callback)
-
-        # Check that callback was called for each sheet
-        assert len(progress_calls) == 3
-        assert progress_calls[0] == (0, 3, "Sheet1")
-        assert progress_calls[1] == (1, 3, "Sheet2")
-        assert progress_calls[2] == (2, 3, "EmptySheet")
-
-    def test_file_not_found(self):
-        """Test handling of non-existent file."""
+    def test_file_not_found(self) -> None:
         with pytest.raises(FileNotFoundError):
             get_sheet_names("nonexistent.xlsx")
-
         with pytest.raises(FileNotFoundError):
             get_sheet_row_count("nonexistent.xlsx", "Sheet1")
-
         with pytest.raises(FileNotFoundError):
             process_excel_file("nonexistent.xlsx")
