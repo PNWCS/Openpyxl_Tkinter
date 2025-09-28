@@ -21,25 +21,28 @@ def select_excel_file() -> str:
         Opens a file dialog that allows users to select .xlsx files only.
     """
     file_path = filedialog.askopenfilename(
-        title="Select Excel File", filetypes=[("Excel Files", "*.xlsx")], defaultextension=".xlsx"
+        title="Select Excel File",
+        filetypes=[("Excel Files", "*.xlsx")],
+        defaultextension=".xlsx",
     )
-    return file_path or ""
+
+    return file_path
 
 
 def update_progress(progress_bar: ttk.Progressbar, current: int, total: int) -> None:
     """Update the progress bar.
 
     Args:
-        progress_bar: The progress bar widget to update
-        current: Current sheet number (0-based)
-        total: Total number of sheets
+        progress_bar: The ttk Progressbar widget
+        current: Current progress value
+        total: Total value for completion
 
     Note:
-        Calculates the percentage and updates the progress bar value.
+        Sets the progress bar's value based on current and total.
     """
     if total > 0:
-        percent = int((current + 1) / total * 100)
-        progress_bar["value"] = percent
+        progress = (current / total) * 100
+        progress_bar["value"] = progress
         progress_bar.update_idletasks()
 
 
@@ -135,6 +138,7 @@ def run_app() -> None:
     root = create_main_window()
 
     # Create and pack widgets
+    # Button frame
     button_frame = tk.Frame(root)
     button_frame.pack(pady=10)
 
@@ -143,24 +147,28 @@ def run_app() -> None:
     )
     select_button.pack()
 
+    # Progress frame
     progress_frame = tk.Frame(root)
     progress_frame.pack(pady=5)
 
     progress_bar = ttk.Progressbar(progress_frame, length=400, mode="determinate")
     progress_bar.pack()
 
+    # Status frame
     status_frame = tk.Frame(root)
     status_frame.pack(pady=5)
 
     status_label = tk.Label(status_frame, text="Select an Excel file to begin", font=("Arial", 10))
     status_label.pack()
 
+    # Results frame
     results_frame = tk.Frame(root)
     results_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
     results_label = tk.Label(results_frame, text="Results:", font=("Arial", 10, "bold"))
     results_label.pack(anchor="w")
 
+    # Text widget with scrollbar
     text_frame = tk.Frame(results_frame)
     text_frame.pack(fill="both", expand=True)
 
@@ -181,4 +189,6 @@ def run_app() -> None:
             )
 
     select_button.config(command=on_select_file)
+
+    # Start the application
     root.mainloop()

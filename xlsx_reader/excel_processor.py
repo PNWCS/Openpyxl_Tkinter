@@ -5,31 +5,68 @@ sheet information using pandas.
 """
 
 from collections.abc import Callable
+
 from openpyxl import load_workbook
 
 
 def get_sheet_names(file_path: str) -> list[str]:
-    wb = load_workbook(file_path, read_only=True)
-    sheetnames = wb.sheetnames
-    wb.close()  # <-- close workbook to release file handle
-    return sheetnames
+    """Get all sheet names from an Excel file.
+
+    Args:
+        file_path (str): Path to the Excel file (.xlsx)
+
+    Returns:
+        List[str]: List of sheet names in the workbook
+
+    Note:
+        Uses openpyxl to read the sheet names without loading all data.
+    """
+    wb = load_workbook(filename=file_path, read_only=True)
+    sheet_names = wb.sheetnames
+    wb.close()
+    return sheet_names
 
 
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
-    wb = load_workbook(file_path, read_only=True)
-    sheet = wb[sheet_name]
-    row_count = 0
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        if any(cell is not None and str(cell).strip() != "" for cell in row):
-            row_count += 1
-    wb.close()  # <-- close workbook here
+    """Get the number of rows in a specific sheet.
+
+    Args:
+        file_path (str): Path to the Excel file (.xlsx)
+        sheet_name (str): Name of the sheet to analyze
+
+    Returns:
+        int: Number of rows in the sheet
+
+    Note:
+        Uses openpyxl to count rows with data in the specified sheet.
+        Excludes header row from count.
+    """
+    wb = load_workbook(filename=file_path, read_only=True)
+    ws = wb[sheet_name]
+    row_count = ws.max_row - 1
+    wb.close()
     return row_count
 
 
 def process_excel_file(
     file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
 ) -> dict[str, int]:
-    """Process an Excel file and return row counts for each sheet."""
+    """Process an Excel file and return row counts for each sheet.
+
+    Args:
+        file_path (str): Path to the Excel file (.xlsx)
+        progress_callback (Optional[Callable]): Function to call for progress updates.
+            Receives (current_sheet_index, total_sheets, sheet_name)
+
+    Returns:
+        Dict[str, int]: Dictionary mapping sheet names to their row counts
+
+    Note:
+        1. Get all sheet names using get_sheet_names()
+        2. For each sheet, call get_sheet_row_count()
+        3. Call progress_callback if provided
+        4. Return a dictionary with sheet names as keys and row counts as values
+    """
     sheet_names = get_sheet_names(file_path)
     total_sheets = len(sheet_names)
     results = {}
