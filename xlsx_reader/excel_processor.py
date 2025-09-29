@@ -21,7 +21,11 @@ def get_sheet_names(file_path: str) -> list[str]:
     Note:
         Uses openpyxl to read the sheet names without loading all data.
     """
-    raise NotImplementedError()
+    work_book = load_workbook(file_path, read_only=True, data_only=True)
+    try:
+        return list(work_book.sheetnames)
+    finally:
+        work_book.close()
 
 
 def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
@@ -38,7 +42,21 @@ def get_sheet_row_count(file_path: str, sheet_name: str) -> int:
         Uses openpyxl to count rows with data in the specified sheet.
         Excludes header row from count.
     """
-    raise NotImplementedError()
+    work_book = load_workbook(file_path, read_only=True, data_only=True)
+    try:
+        if sheet_name not in work_book.sheetnames:
+            raise ValueError(f"Sheet not found: {sheet_name}")
+        ws = work_book[sheet_name]
+
+        # Count rows that have at least one non-None value, starting from row 2 (skip header)
+        count = 0
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if any(cell is not None for cell in row):
+                count += 1
+        return count
+    finally:
+        work_book.close()
+
 
 def process_excel_file(
     file_path: str, progress_callback: Callable[[int, int, str], None] | None = None
